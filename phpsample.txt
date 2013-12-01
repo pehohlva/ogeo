@@ -1,0 +1,11 @@
+<?
+/// hidden php file to make query on sqlite3 
+
+$iplonglong(int) = ip2long ( string $ip_address );
+
+$db = new SQLite3;
+$statement = $db->prepare('SELECT * FROM table WHERE id = :id;');
+$statement->bindValue(':id', $id);
+$result = $statement->execute();
+
+?>
