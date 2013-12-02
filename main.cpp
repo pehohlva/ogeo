@@ -41,6 +41,9 @@ int main(int argc, char *argv[]) {
         usagethisapp(argv[0], argc);
         return (1);
     }
+    
+    qDebug() << qApp->libraryPaths();
+    
     QDateTime timer0(QDateTime::currentDateTime());
     const QString nametime = timer0.toString("dd.MM.yyyy.HH.mm.ss.zzz");
     int modus = 0;
