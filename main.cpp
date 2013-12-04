@@ -72,14 +72,16 @@ int main(int argc, char *argv[]) {
         } else if ((!strcmp(argv[i], "-ip"))) {
             /// grep ip 
             modus = 3;
-            int namer = i + 1;
-            if (argc >= namer) {
-                ipaddo = ogeoarg.at(namer);
+            int namer = i + 2;
+            
+            if (ogeoarg.size() >= namer ) {
+                ipaddo = ogeoarg.at(namer - 1);
             } else {
                 printf("Write the ip after -ip *** , unable to find your string..\n");
                 return (1);
             }
         }
+        //// GEOBEEB() << "namer:" << namer  << "|" << ogeoarg.size();  
     }
     if (modus == 0) {
         return (1);

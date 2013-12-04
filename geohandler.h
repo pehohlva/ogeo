@@ -63,6 +63,9 @@ const int pointo = 76;
 #define GEOIPCACHE \
              QString("%1/.GeoIp/").arg(QDir::homePath())
 
+#define WORKSQLITE3 \
+              QString("geoipDB.db3")
+
 #if 1 //// 1 or 0 
 #define GEOBEEB qDebug
 #else
@@ -107,6 +110,9 @@ private:
         QStringList fileincomming;
         QDir dir;
         QString ipadress;
+        
+        bool OnService;
+        SqlConsole::SqlMini *miniDB;
 };
 
 #endif // GEOHANDLER_H

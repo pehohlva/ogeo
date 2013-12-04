@@ -61,6 +61,7 @@ namespace SqlConsole {
     class SqlMini {
     public:
         SqlMini();
+        //// set file = "ram"  to work on :memory: db
         bool open_DB(const QString & sqlitefile, DBopenMode VARIANTOPEN = UTF_8);
         //// fast check if file is a dbsqliteformat 3
         bool check_file_DB(const QString & sqlitefile);
@@ -68,32 +69,43 @@ namespace SqlConsole {
         void query_console(const QString query);
         //// to update or other no result output ... 
         bool simple_query(const QString query);
+        
+        qint64 lastInserID() {
+            return LastInsertID;
+        }
         ConsoleTable query_2Table(const QString query);
 
-        bool isOpen() const {
-            return _db != 0;
+        bool isOpen() {
+            return is_open;
         }
         void _consolelog(const QString line, int modus = 0);
         void displayTable();
-        ConsoleTable Table(sqlite3_stmt *sqlStatement);
         bool vacumdb(); /// long time if db is big rebuild and order data to bee faster...
-
+        void handle_sp(); /// special query .. 
         ~SqlMini();
     private:
         void send_error(const int rec);
         void interactive(); /// take comand from user and exec...
-        void handle_sp(); /// special query .. 
+        
         QString dump_header(const QString table);
         sqlite3 * _db; /// instance of current database...
         bool dirty; /// dirty false = db not having VACUUM comand. / dirty true is compact and faster
-        int dberror; /// record last error 
+ 
         QString opendbfilecurrent; /// file dbsqlite3 running
         Fileversion sversion;
         bool is_open;
         bool is_notcommit;
-        QString LastErrorMessage;
+        
+        
+              //// hot variable to clean each time & query!:
+        ConsoleTable Table(sqlite3_stmt *sqlStatement);
+        void set_Rows_Columns(sqlite3_stmt *sqlStatement);
+        void clean_query(); /// call to clean..
+        int NumRowIn;
+        int NumColumnsIn;
         qint64 LastInsertID;
-        QString LastQueryIncomming;
+        QString LastErrorMessage;
+        int dberror; /// record last error 
                
 
     };

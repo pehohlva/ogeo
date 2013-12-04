@@ -86,23 +86,29 @@ static QString strips_carcomma(QString istring) {
     return new_string;
 }
 
-GeoHandler::GeoHandler(QObject *parent, int modus) :
-QObject(parent), actionmake(modus) {
-    if (!dir.exists(GEOIPCACHE)) {
+bool GeoHandler::_sql(const QString q) {
+    ////// SQLBEEP() << q << " incomming query....";
+    if (miniDB->isOpen()) {
+        bool sqlmake = miniDB->simple_query(q);
+        if (sqlmake) {
+            qint64 run_on = miniDB->lastInserID();
+            return true;
+        } else {
+            /// on error console read ...
+        }
+    } else {
+        qFatal("DB connection not open .... ");
+    }
+    return false;
+}
 
+GeoHandler::GeoHandler(QObject *parent, int modus) :
+QObject(parent), actionmake(modus), miniDB(new SqlConsole::SqlMini()),OnService(false) {
+    if (!dir.exists(GEOIPCACHE)) {
         dir.mkpath(GEOIPCACHE);
     }
-    ///  DROP TABLE IF EXISTS name
-   
-    /// db.setDatabaseName(GEOIPCACHE + "geoipDB.db3");
-    QString userMake("CREATE TABLE IF NOT EXISTS geouser ( uid INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT);");
-    QString logMake("CREATE TABLE IF NOT EXISTS geolog ( uid INTEGER PRIMARY KEY AUTOINCREMENT,action TEXT);");
-    this->_sql(userMake);
-    this->_sql(logMake);
-    QDateTime timer0(QDateTime::currentDateTime());
-    const QString nametime = timer0.toString("dd.MM.yyyy.HH.mm.ss.zzz");
-    const QString salog = QString("INSERT INTO geolog VALUES (NULL,\"Open app on %1\");").arg(nametime);
-    this->_sql(salog);
+
+
 
 
 
@@ -124,9 +130,34 @@ QObject(parent), actionmake(modus) {
 }
 
 void GeoHandler::execute() {
+
+    bool dbisnowOpen = false;
+    const QString db3file = GEOIPCACHE + WORKSQLITE3;
+    if (miniDB->check_file_DB(db3file)) {
+        SQLBEEP() << " Valid file db3 ok... " << db3file;
+        dbisnowOpen = miniDB->open_DB(db3file);
+    } else {
+        QFile::remove(db3file);
+        SQLBEEP() << " NOT!!  Valid file db3 try to remove " << db3file;
+        dbisnowOpen = miniDB->open_DB(db3file);
+    }
+    if (!dbisnowOpen) {
+        qFatal("DB is not open unable to write on disk...");
+    }
+
+    QString userMake("CREATE TABLE IF NOT EXISTS geouser ( uid INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT);");
+    QString logMake("CREATE TABLE IF NOT EXISTS geolog ( uid INTEGER PRIMARY KEY AUTOINCREMENT,action TEXT);");
+    QString tablecoutryname("CREATE TABLE IF NOT EXISTS geolog ( uid INTEGER PRIMARY KEY AUTOINCREMENT,action TEXT);");
+    this->_sql(userMake);
+    this->_sql(logMake);
+    QDateTime timer0(QDateTime::currentDateTime());
+    const QString nametime = timer0.toString("dd.MM.yyyy.HH.mm.ss.zzz");
+    const QString salog = QString("INSERT INTO geolog VALUES (NULL,\"Open app on %1\");").arg(nametime);
+    this->_sql(salog);
+
     QTextStream out(stdout);
     if (actionmake == 1) {
-        //// download item
+        //// download ite
 
         foreach(QString sturl, url_list_take) {
             QUrl uri(sturl);
@@ -153,8 +184,8 @@ void GeoHandler::execute() {
                          AND blk.endipnum > %1 \
                          AND loc.locid = blk.locId;").arg(qtip.toIPv4Address()).simplified();
         QString hresult;
-  
-        out << "Check int.." << qtip.toIPv4Address() << " ip " << ipadress << "  \n";
+
+        out << "db popolate ... Check int.." << qtip.toIPv4Address() << " ip " << ipadress << "  \n";
         out << "sql:" << question << "  \n";
         out << "rec:" << hresult << "  \n";
         out.flush();
@@ -223,25 +254,33 @@ bool GeoHandler::recTable(const QString csvfile) {
             /// out << sale << "\r";
             out.flush();
         }
-    }
 
-    /// search ip on 1ms faster as mysql hack... 
-    if (tablename == "geoblocks") {
+        if (OnService) {
+            if (xcursor == 400) {
+                break;
+            }
+        }
+
+
+    }
+    /// search ip on 100ms faster as mysql... sqlite hack... geolocation && geoblocks
+    if (tablename == "geolocation") {
+        this->_sql(QString("ALTER TABLE geolocation ADD COLUMN fucountry TEXT;"));
+    } else if (tablename == "geoblocks") {
         this->_sql(QString("ALTER TABLE geoblocks ADD COLUMN idx INTEGER;"));
         this->_sql(QString("CREATE INDEX geoidx ON geoblocks(idx);"));
         this->_sql(QString("UPDATE geoblocks SET idx = (endipnum - (endipnum % 65536));"));
-        /* query at end is: ip to long long after
-            SELECT loc.*
-              FROM geolocation loc,
-                   geoblocks blk
-             WHERE blk.idx = (3588090629-(3588090629 % 65536))
-               AND blk.startipnum < 3588090629
-               AND blk.endipnum > 3588090629
-               AND loc.locid = blk.locId;  
-         */
+    } else if (tablename == "geoipcountrywhois") {
+        ///// QString takename("select distinct tab_4,tab_5 from geoipcountrywhois order by tab_4");
+        QString d_worldname = QString("DROP TABLE IF EXISTS countryworld;");
+        QString rec_worldname = QString("CREATE TABLE countryworld ( country TEXT,longcountry TEXT);");
+        this->_sql(d_worldname);
+        this->_sql(rec_worldname);
+        QString refill_worldname = QString("INSERT INTO countryworld select distinct tab_4,tab_5 from geoipcountrywhois order by tab_4;");
+        this->_sql(refill_worldname);
+        QString sqldrem = QString("DROP TABLE IF EXISTS %1;").arg(tablename);
+        this->_sql(sqldrem);
     }
-
-
     out << "Table " << tablename << " end - total line:" << total_lines << "\n";
     out << str.fill(QChar('*'), 76) << "\n";
     out.flush();
@@ -397,7 +436,13 @@ void GeoHandler::csvread() {
         const QString csvfile = fileincomming.at(i);
         bool parse = recTable(csvfile);
     }
-
+    ///// service .... 
+    if (miniDB->isOpen()) {
+        miniDB->handle_sp();
+        miniDB->vacumdb();
+        miniDB->_consolelog("Prepare to quit...");
+        miniDB->_consolelog("Table ready to query ip adress... by..");
+    }
     this->quit();
 }
 
@@ -543,11 +588,6 @@ void GeoHandler::downloadFinished(QNetworkReply *reply) {
         }
     }
 
-}
-
-bool GeoHandler::_sql(const QString q) {
-
-    return false;
 }
 
 void GeoHandler::quit() {

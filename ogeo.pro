@@ -16,6 +16,13 @@ CONFIG +=   qt warn_off silent release
 CONFIG   -= app_bundle  debug
 LIBS   += -lz
 
+TARGET = ogeo
+BINDIR = /usr/bin
+target.path = $$BINDIR
+INSTALLS += target
+
+
+
 # Input
 HEADERS += decompress.h \
            geohandler.h

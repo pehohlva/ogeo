@@ -11,9 +11,11 @@
 
 namespace SqlConsole {
 
-    SqlMini::SqlMini() : is_open(false), dirty(true), is_notcommit(false),LastInsertID(0) {
+    SqlMini::SqlMini() : is_open(false), dirty(true), is_notcommit(false), LastInsertID(0) {
         //// init class from sqlite3 console namenspace...
+        clean_query(); /// reset al by db open or not..
     }
+
     ConsoleTable SqlMini::query_2Table(const QString query) {
         int rec = 0;
         ConsoleTable dummy;
@@ -27,6 +29,7 @@ namespace SqlConsole {
         }
         rec = sqlite3_prepare(_db, qPrintable(query), -1, &sqlStatement, NULL);
         if (rec == SQLITE_OK) {
+            set_Rows_Columns(sqlStatement);
             return Table(sqlStatement);
         } else {
             send_error(rec);
@@ -36,30 +39,26 @@ namespace SqlConsole {
 
     bool SqlMini::simple_query(const QString query) {
         int rec = 0;
-        bool mayberowcount = false;
-        bool currentAction = false;
-        LastQueryIncomming = query;
-        QString controller = LastQueryIncomming.toLower();
-        if ( controller.indexOf("select") !=-1 || controller.indexOf("distinct") !=-1  ) {
-            //// If you want the row count in advance, then there's no easy way. ... lol.
-            mayberowcount = true;
-        }
+        bool query_success = false;
         sqlite3_stmt *sqlStatement;
-        LastErrorMessage.clear();
+        LastErrorMessage = QString();
         if (!isOpen()) {
-            LastErrorMessage = QString(i18n("Warning! DB is not open!..."));
+            LastErrorMessage = QString("Warining! DB is not open!");
             this->_consolelog(LastErrorMessage);
             return false;
         }
         rec = sqlite3_prepare(_db, qPrintable(query), -1, &sqlStatement, NULL);
         if (rec == SQLITE_OK) {
-            qint64 MaybeLastInsertID = sqlite3_last_insert_rowid(_db);
+            set_Rows_Columns(sqlStatement);
+            ///// DBTELL() << "NumRowIn:" << NumRowIn << "NumColumn:" << NumColumnsIn;
+            qint64 lastinsID = sqlite3_last_insert_rowid(_db);
             if (lastinsID > 0) {
-                LastInsertID = MaybeLastInsertID;
-                currentAction = true;
+                LastInsertID = lastinsID;
+                query_success = true;
+                //// QString lastrow_id = QString("Last insert Row ID:%1.").arg(QString::number(lastinsID));
+                //// this->_consolelog(lastrow_id);
             }
-            if (sqlite3_step(sqlStatement) == SQLITE_ROW) {
-                int coolcheck = sqlite3_data_count(sqlStatement);
+            if (NumRowIn > 0 && NumColumnsIn > 0) {
                 ConsoleTable Result = Table(sqlStatement);
                 const int rowf = Result.rowCount();
                 QStringList header_name = Result.header();
@@ -71,13 +70,18 @@ namespace SqlConsole {
                 this->_consolelog(header_name.join(" | "), 2);
                 QString sumtot = QString("Total row:%1").arg(rowf);
                 this->_consolelog(sumtot);
-                this->_consolelog(QString(), 3);
-                currentAction = true;
+                //// this->_consolelog(QString(), 3);
+                (void) clean_query(); /// !! important!! clean memory!
+                query_success = true;
+            } else {
+                (void) clean_query();
             }
         } else {
             send_error(rec);
+            (void) clean_query();
+            return false;
         }
-        return currentAction;
+        return query_success;
     }
 
     void SqlMini::query_console(const QString query) {
@@ -92,9 +96,8 @@ namespace SqlConsole {
     }
 
     QString SqlMini::dump_header(const QString table) {
-        QString recalc("select sql sqlite_master where name='%1' limit 1;").arg(table);
+        QString recalc = QString("select sql sqlite_master where name='%1' limit 1;").arg(table);
         ConsoleTable query = SqlMini::query_2Table(recalc);
-        
         return QString();
     }
 
@@ -150,8 +153,8 @@ namespace SqlConsole {
     }
 
     void SqlMini::handle_sp() {
-        QString recalc("select distinct tab_4,tab_5 from geoipcountrywhois order by tab_4;");
-        ConsoleTable query = SqlMini::query_2Table(recalc);
+        QString recalc("select distinct country,longcountry from countryworld order by country;");
+        ConsoleTable query = query_2Table(recalc);
         const int rowf = query.rowCount();
         if (rowf == 0) {
             return;
@@ -171,10 +174,6 @@ namespace SqlConsole {
                 QString bad = QString("%1) tot:%2| Fail:").arg(i).arg(rowf);
                 this->_consolelog(bad + updd);
             }
-            //// DBTELL() << " sql:" << updd;
-            // select * from geolocation where country='';
-            /// delete from geolocation where country='';
-            //  DROP TABLE  IF EXISTS name
 
         }
     }
@@ -189,35 +188,38 @@ namespace SqlConsole {
                 "WHERE type='table' "
                 "ORDER BY name;";
         this->query_console(table_display);
-        interactive();
     }
 
     ConsoleTable SqlMini::Table(sqlite3_stmt *sqlStatement) {
+
         int rowsrc = -1;
         ConsoleTable table;
         table.clean();
-        const int colums = sqlite3_data_count(sqlStatement);
-        //// DBTELL() << " reg on  Table " << rowsrc << " x " << colums;
-        table.setCapacity(colums);
-        while (sqlite3_step(sqlStatement) == SQLITE_ROW) {
-            rowsrc++;
-
-            //// DBTELL() << " reg on  rowsrc " << rowsrc << " x " << colums;
-
-            for (int e = 0; e < colums; e++) {
-                ConsoleCell field;
-                const QByteArray column_Name = QByteArray((const char *) sqlite3_column_name(sqlStatement, e));
-                const QByteArray column_Value = QByteArray((const char *) sqlite3_column_text(sqlStatement, e));
-                const int column_Type = sqlite3_column_type(sqlStatement, e);
-                field.setData(column_Name, QVariant(column_Value), column_Type);
-                field.setCell(rowsrc, e);
-                table.insert(field);
+        ///// DBTELL() << "NumRowIn:" << NumRowIn << "NumColumn:" << NumColumnsIn;
+        table.setCapacity(NumColumnsIn); //// make null header if no NumRowIn...
+        if (NumRowIn > 0) {
+            while (sqlite3_step(sqlStatement) == SQLITE_ROW) {
+                rowsrc++;
+                for (int e = 0; e < NumColumnsIn; e++) {
+                    ConsoleCell field;
+                    const QByteArray column_Name = QByteArray((const char *) sqlite3_column_name(sqlStatement, e));
+                    const QByteArray column_Value = QByteArray((const char *) sqlite3_column_text(sqlStatement, e));
+                    const int column_Type = sqlite3_column_type(sqlStatement, e);
+                    field.setData(column_Name, QVariant(column_Value), column_Type);
+                    field.setCell(rowsrc, e);
+                    table.insert(field);
+                }
             }
-            //// DBTELL() << " by end rowsrc " << rowsrc << " x " << colums;
         }
         table.end();
+        //// clean query
+        (void) clean_query();
         return table;
     }
+
+
+
+    //// http://www.sqlite.org/c3ref/c_open_autoproxy.html 
 
     /* open the file or the memory db  */
     bool SqlMini::open_DB(const QString & sqlitefile, DBopenMode VARIANTOPEN) {
@@ -232,10 +234,9 @@ namespace SqlConsole {
             dberror = sqlite3_open16(qPrintable(sqlitefile), &_db);
         }
         if (dberror) {
-            LastErrorMessage = QString::fromUtf8(sqlite3_errmsg(_db));
+            send_error(dberror);
             sqlite3_close(_db);
             _db = 0;
-            this->_consolelog(LastErrorMessage);
             return ok;
         }
 
@@ -243,8 +244,6 @@ namespace SqlConsole {
             if (SQLITE_OK == sqlite3_exec(_db, "PRAGMA empty_result_callbacks = ON;", NULL, NULL, NULL)) {
                 if (SQLITE_OK == sqlite3_exec(_db, "PRAGMA show_datatypes = ON;", NULL, NULL, NULL)) {
                     ok = true;
-                    //// this->vacumdb();
-                    this->displayTable();
                 }
             }
 
@@ -267,7 +266,8 @@ namespace SqlConsole {
             const int gzip_magic = QChar(header[1]).unicode(); //// header[1] = 0x8b; // gzip-magic[1] 
             const int unicodeNumber = QChar(header[14]).unicode(); /// is 3 = unicode 51 from SQLite version 3
             header.resize(6);
-            if (header == "SQLite" && unicodeNumber == 51) {
+            DBTELL() << "header file " << unicodeNumber;
+            if ( unicodeNumber == 51 ) {
                 sqlfilefinder = true;
                 sversion = Vsql3;
             }
@@ -316,9 +316,28 @@ namespace SqlConsole {
     }
 
     SqlMini::~SqlMini() {
-        _db = NULL;
+        sqlite3_close(_db);
+        _db = 0;
     }
 
+    void SqlMini::set_Rows_Columns(sqlite3_stmt *sqlStatement) {
+        int rows = 0;
+        if (sqlite3_step(sqlStatement) == SQLITE_ROW) {
+            NumColumnsIn = sqlite3_data_count(sqlStatement);
+            while (sqlite3_step(sqlStatement) == SQLITE_ROW) {
+                rows++;
+            }
+        }
+        NumRowIn = rows;
+    }
+
+    void SqlMini::clean_query() {
+        NumRowIn = 0;
+        NumColumnsIn = 0;
+        LastErrorMessage.clear();
+        LastInsertID = 0;
+        dberror = 0;
+    }
 
 
 
