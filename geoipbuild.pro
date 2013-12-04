@@ -6,9 +6,12 @@
 
 CONFIG +=   warn_off silent
 QT       += core xml network sql gui
+# remove sql after sqlite3 inside
 cache()
 # object better
 greaterThan( QT_MAJOR_VERSION, 4 ):QT *= widgets
+# history from console action sql and other download
+LIBS += -lreadline -lcurses 
 
 CONFIG   += console release
 CONFIG   -= app_bundle  debug
