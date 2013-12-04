@@ -9,3 +9,33 @@ $statement->bindValue(':id', $id);
 $result = $statement->execute();
 
 ?>
+
+SELECT loc.fucountry AS paese, loc.city AS citta
+              FROM geolocation loc,
+                   geoblocks blk
+             WHERE blk.idx = (3588090629-(3588090629 % 65536))
+               AND blk.startipnum < 3588090629
+               AND blk.endipnum > 3588090629
+               AND loc.locid = blk.locId;  
+
+ countryworld.sql
+    CREATE TABLE "countryworld" ( country TEXT,longcountry TEXT);
+    INSERT INTO countryworld select distinct tab_4,tab_5 from geoipcountrywhois order by tab_4;
+
+sqlite3 sgeo.db3
+.read  countryworld.sql
+.read geoblocks.sql
+.read geolocation.sql
+
+
+
+select count(*) as tot from geolocation where country !='';
+select * from geolocation where id > 442118 limit 11;
+
+delete from geolocation where id > 442118;
+
+static int line_contains_semicolon(const char *z, int N){
+  int i;
+  for(i=0; i<N; i++){  if( z[i]==';' ) return 1; }
+  return 0;
+}

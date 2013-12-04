@@ -5,6 +5,7 @@
 // Copyright: See COPYING file that comes with this distribution
 
 #include "geohandler.h"
+#include "sqlite3/qt_sqlite3.h"
 
 //// endresult sqlite3   /Users/dev/.GeoIp/geoipDB.db3
 //// http://www.splitbrain.org/blog/2011-02/12-maxmind_geoip_db_and_sqlite
@@ -92,8 +93,8 @@ QObject(parent), actionmake(modus) {
         dir.mkpath(GEOIPCACHE);
     }
     ///  DROP TABLE IF EXISTS name
-    db = QSqlDatabase::addDatabase("QSQLITE");
-    db.setDatabaseName(GEOIPCACHE + "geoipDB.db3");
+   
+    /// db.setDatabaseName(GEOIPCACHE + "geoipDB.db3");
     QString userMake("CREATE TABLE IF NOT EXISTS geouser ( uid INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT);");
     QString logMake("CREATE TABLE IF NOT EXISTS geolog ( uid INTEGER PRIMARY KEY AUTOINCREMENT,action TEXT);");
     this->_sql(userMake);
@@ -152,35 +153,7 @@ void GeoHandler::execute() {
                          AND blk.endipnum > %1 \
                          AND loc.locid = blk.locId;").arg(qtip.toIPv4Address()).simplified();
         QString hresult;
-        QSqlQuery query(db);
-        if (query.exec(question)) {
-                
-                QSqlRecord rec = query.record();
-                int sumcol = rec.count();
-                int sumrow = query.numRowsAffected();
-                while (query.next()) { 
-                    QStringList row;
-                    row.clear();
-                    for(int i=0;i<sumcol;i++){
-                        QSqlField fld = rec.field(i);
-                        QString fname = rec.fieldName(i);
-                        QString fval = query.value(i).toString();
-                        row << fname;
-                        row << fval;
-                    }
-                    QString dd = row.join("|");
-                    dd.append("\n");
-                    hresult.append(dd);
-                }
-        } else {
-            out << "Warning... check if table exist on dir:  \n";
-            out << GEOIPCACHE <<  "geoipDB.db3  \n";
-            out.flush();
-            QString errorim = QString(query.lastError().text());
-            errorim.append(" -> ");
-            errorim.append(question);
-            hresult = errorim;
-        }
+  
         out << "Check int.." << qtip.toIPv4Address() << " ip " << ipadress << "  \n";
         out << "sql:" << question << "  \n";
         out << "rec:" << hresult << "  \n";
@@ -573,31 +546,11 @@ void GeoHandler::downloadFinished(QNetworkReply *reply) {
 }
 
 bool GeoHandler::_sql(const QString q) {
-    if (db.open()) {
-        QSqlQuery query(db);
-        if (query.exec(q)) {
-            return true;
-        } else {
-            QString errorim = QString(query.lastError().text());
-            errorim.append(" -> ");
-            errorim.append(q);
-            SQLBEEP() << "Error on query:" << errorim << " ... fail..!";
-            qFatal("Fatal qsl......");
-        }
-    } else {
-
-        SQLBEEP() << "Error BB not open....";
-    }
 
     return false;
 }
 
 void GeoHandler::quit() {
-
-    if (db.open()) {
-
-        db.close();
-    }
     QCoreApplication::instance()->quit();
 }
 

@@ -36,11 +36,14 @@
 #include <QObject>
 #include <QTimer>
 #include <QDateTime>
-#include <QtSql/QtSql>
-#include "decompress.h"
 #include <QHostAddress>
 
-#if 0 //// 1 or 0 
+#include "sqlite3/qt_sqlite3.h"
+#include "decompress.h"
+
+
+
+#if 1 //// 1 or 0 
 #define SQLBEEP qDebug
 #else
 #define SQLBEEP if (0) qDebug
@@ -56,7 +59,7 @@ const int pointo = 76;
 
 #define __APPNAME__ \
               QString("GeoIp Handler")
-
+//// endresult sqlite3   /Users/dev/.GeoIp/geoipDB.db3
 #define GEOIPCACHE \
              QString("%1/.GeoIp/").arg(QDir::homePath())
 
@@ -103,7 +106,6 @@ private:
         QStringList url_list_take;
         QStringList fileincomming;
         QDir dir;
-        QSqlDatabase db;
         QString ipadress;
 };
 

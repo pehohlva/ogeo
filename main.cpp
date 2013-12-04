@@ -90,7 +90,5 @@ int main(int argc, char *argv[]) {
         job->setIp(ipaddo);
     }
     QTimer::singleShot(0, job, SLOT(execute()));
-    //// QObject::connect(job, SIGNAL(quit()),&a, SLOT(quit()));
-    ////  GEOBEEB() <<  "lastline:" << __LINE__;
     return a.exec();
 }
