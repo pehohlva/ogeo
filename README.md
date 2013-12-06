@@ -43,5 +43,6 @@ to build on qt5  http://qt-project.org/
 git clone https://github.com/pehohlva/ogeo.git
 cd ogeo
 qmake && make  
+make install on mac or linux
 
 ```
