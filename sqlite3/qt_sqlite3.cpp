@@ -28,7 +28,7 @@ Q_DECLARE_METATYPE(sqlite3*)
 Q_DECLARE_OPAQUE_POINTER(sqlite3_stmt*)
 Q_DECLARE_METATYPE(sqlite3_stmt*)
 
-#if 1 //// 1 or 0 
+#if 0 //// 1 or 0 
 #define DBPR qDebug
 #else
 #define DBPR if (0) qDebug
