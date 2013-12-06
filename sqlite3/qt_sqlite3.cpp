@@ -618,7 +618,7 @@ namespace SqlConsole {
     void SqlMini::dump_table(const QString table, const QString tofile) {
         QString destfile = tofile;
         if (destfile.size() < 2) {
-            destfile = QString("%.sql").arg(table);
+            destfile = QString("%1.sql").arg(table);
         }
         int xtot = rowCountTable(table);
         const QString xlink = QString("INSERT INTO %1 (").arg(table);
