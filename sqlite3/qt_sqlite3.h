@@ -1,13 +1,17 @@
-/* 
- * File:   qt_sqlite3.h
- * Author: dev
- *  4.12.13 untested work progress ..
- * Created on 4. dicembre 2013, 08:45
- */
+//
+// MiniSql to use on QT  sqlite3 database 
+// Author: Peter Hohl <pehohlva@gmail.com>,    1.12.2013
+// http://www.freeroad.ch/
+// Copyright: See COPYING file that comes with this distribution
+
+// last update 6.12.2013
 
 #ifndef QT_SQLITE3_H
 #define	QT_SQLITE3_H
 
+#include<time.h> // for clock
+#include <math.h> // for fmod
+#include <cstdlib> //for system
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -32,82 +36,135 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 #include "console_table.h"
+#include <readline/readline.h>
+#include <readline/history.h>
 
+static int line_have_semicolon(const char *z, int N) {
+    int i;
+    for (i = 0; i < N; i++) {
+        if (z[i] == ';') return 1;
+    }
+    return 0;
+}
+
+static QString Fx(int fo) {
+    QString str;
+    QString leading("0");
+    str.setNum(fo);
+    if ( str.size() == 1 ) {
+        return leading + str;
+    } else {
+       return str; 
+    }
+}
+
+static QString CronoStop(const int Selapsed) {
+    int ddays = 0;
+    int dhh = 0;
+    int dmm = 0;
+    int dss = 0;
+    if (Selapsed < (60 * 60 * 24)) {
+        dss = fmod(Selapsed, 60);
+        int minutes = Selapsed / 60;
+        dmm = fmod(minutes, 60);
+        int hours = minutes / 60;
+        dhh = hours;
+        return QString("El.%1:%2:%3").arg(Fx(dhh)).arg(Fx(dmm)).arg(Fx(dss));
+    } else {
+        return QString("One day.. stop it...");
+    }
+}
+
+struct LongTimer {
+    uint fstart;
+    uint lastpit;
+
+    void start() {
+        fstart = time_nowLong();
+    }
+
+    void start_mid() {
+        lastpit = time_nowLong();
+    }
+
+    /* time null unix time long nummer */
+    uint time_nowLong() {
+        QDateTime timer1(QDateTime::currentDateTime());
+        return timer1.toTime_t();
+    }
+
+    QString elapsedFromStart() {
+        uint current = time_nowLong();
+        int Selapsed = current - fstart;
+        return CronoStop(Selapsed);
+    }
+
+    QString elapsedFromLast() {
+        uint current = time_nowLong();
+        int Selapsed = current - lastpit;
+        return CronoStop(Selapsed);
+    }
+};
+
+
+
+
+
+//// -help" || rmake == "-f1" || rmake == "-h" 
 
 static char zHelpDb[] =
-        ".backup                Backup DB as timename.db FILE\n"
-        ".table                 Show current Table\n"
-        ".sp                    Update country if having table geoipcountrywhois + geolocation\n"
-        ".vacum                 VACUUM to db long time by 100Mb file\n"
-        ".help                  Show this message\n"
-        ".exit                  Exit this program\n"
-        ".quit                  Exit this program\n"
+        "-table  or -t          Show current Table\n"
+        "-dump ?TABLE? ...      Dump the database in an SQL text format\n"
+        "                         If TABLE specified, only dump tables matching\n"
+        "                         LIKE pattern TABLE.\n"
+        "-sp                    Update country if having table geoipcountrywhois + geolocation\n"
+        "-vacum                 VACUUM to db long time by 100Mb file\n"
+        "-lib                   Display sqlite3 version on this app.\n"
+        "-help or -f1 or -h     Show this message\n"
+        "-exit or -quit or -q   Exit this modus\n"
         ;
 
 namespace SqlConsole {
+    
+    #define MINISQLVERSION 100040
+    #define __MiniSql_Version__ \
+              QString("Ve.1.0.4")
 
-    enum DBopenMode {
-        UTF_8,
-        UTF_16,
-        VFS
-    };
-
-    enum Fileversion {
-        Vsql2,
-        Vsql3,
-        Vsql1
-    };
+    class MiniSqlPrivate;
 
     class SqlMini {
     public:
         SqlMini();
+        void interactive(); /// like original sqlite3 
+        bool isOpen();
         //// set file = "ram"  to work on :memory: db
-        bool open_DB(const QString & sqlitefile, DBopenMode VARIANTOPEN = UTF_8);
+        bool open_DB(const QString & sqlitefile, int modus = 3);
         //// fast check if file is a dbsqliteformat 3
         bool check_file_DB(const QString & sqlitefile);
-        //// display result
-        void query_console(const QString query);
         //// to update or other no result output ... 
         bool simple_query(const QString query);
-        
-        qint64 lastInserID() {
-            return LastInsertID;
-        }
-        ConsoleTable query_2Table(const QString query);
-
-        bool isOpen() {
-            return is_open;
-        }
+        int rowCountTable( const QString tablename );
+        QStringList fieldnamesTable(const QString tablename);
+        void dump_table( const QString table , QString tofile = QString() );
+        SqlResult resultFrom(const QString query);
+        int currentnumberRow();
+        int currentnumberColumn();
+        void clearSqlResult(); // cache /dev/null
+        qint64 lastInserID();
         void _consolelog(const QString line, int modus = 0);
         void displayTable();
-        bool vacumdb(); /// long time if db is big rebuild and order data to bee faster...
+        void vacumdb(); /// long time if db is big rebuild and order data to bee faster...
         void handle_sp(); /// special query .. 
         ~SqlMini();
     private:
-        void send_error(const int rec);
-        void interactive(); /// take comand from user and exec...
         
-        QString dump_header(const QString table);
-        sqlite3 * _db; /// instance of current database...
-        bool dirty; /// dirty false = db not having VACUUM comand. / dirty true is compact and faster
- 
+        ///// sqlite3 * _db; /// instance of current database...
+        //// bool dirty; /// dirty false = db not having VACUUM comand. / dirty true is compact and faster
+
         QString opendbfilecurrent; /// file dbsqlite3 running
-        Fileversion sversion;
-        bool is_open;
-        bool is_notcommit;
-        
-        
-              //// hot variable to clean each time & query!:
-        ConsoleTable Table(sqlite3_stmt *sqlStatement);
-        void set_Rows_Columns(sqlite3_stmt *sqlStatement);
-        void clean_query(); /// call to clean..
-        int NumRowIn;
-        int NumColumnsIn;
         qint64 LastInsertID;
         QString LastErrorMessage;
-        int dberror; /// record last error 
-               
-
+        MiniSqlPrivate *d;
     };
 
 

@@ -1,9 +1,10 @@
-/* 
- * File:   console_table.h
- * Author: dev
- *
- * Created on 4. dicembre 2013, 08:46
- */
+//
+// MiniSql to use on QT  sqlite3 database here SqlResult cache
+// Author: Peter Hohl <pehohlva@gmail.com>,    1.12.2013
+// http://www.freeroad.ch/
+// Copyright: See COPYING file that comes with this distribution
+
+// last update 6.12.2013
 
 #ifndef CONSOLE_TABLE_H
 #define	CONSOLE_TABLE_H
@@ -37,51 +38,159 @@
 
 const int fillconsole = 130;
 
-#if 1 //// 1 or 0 
+#if 0 //// 1 or 0 
 #define DBTELL qDebug
 #else
 #define DBTELL if (0) qDebug
 #endif
 
-struct ConsoleCell {
+
+
+
+
+#define  VINTEGER  1
+#define  VFLOAT  2
+#define  VBLOB  4
+#define  VNULL  5
+#define  VTEXT  3
+#define  VBOOLEAN 10
+
+struct Field {
     int column;
-    int row;
-    int rtype; //  SQLITE_TEXT = 3  / SQLITE_INTEGER = 1  /  SQLITE_FLOAT = 2  / SQLITE_BLOB = 4 / NULL = 5
+    int row; //// if row == -1  is header fieldname...
+    int fieldtype;
     QByteArray rname; /// fielnname 
-    QVariant rdata; /// data from the query 
+    QVariant rdata; /// data filled from the query 
+
+    void init() {
+        column = 0;
+        row = 0;
+        fieldtype = 5;
+    }
+    //// how to convert Field Type
+
+    const int Row() {
+        return row;
+    }
+
+    const int Column() {
+        return column;
+    }
+
+    QVariant::Type getType() {
+        QVariant::Type fieldType;
+        const int currentType = fieldtype;
+        switch (currentType) {
+            case VINTEGER:
+                fieldType = QVariant::Int;
+                break;
+            case VFLOAT:
+                fieldType = QVariant::Double;
+                break;
+            case VBLOB:
+                fieldType = QVariant::ByteArray;
+                break;
+            case VTEXT:
+                fieldType = QVariant::String;
+                break;
+            case VNULL:
+                fieldType = QVariant::Invalid;
+                break;
+            default:
+                fieldType = QVariant::Invalid;
+                break;
+        }
+        return fieldType;
+    }
 
     void setData(QByteArray n, QVariant d, int t) {
         if (d.isNull()) {
-            rname = QByteArray("unknow");
+            rname = QByteArray("uname");
         } else {
             rname = n;
         }
         if (d.isNull()) {
             rdata = QVariant("NULL");
-            rtype = 5;
+            fieldtype = 5;
         } else {
             rdata = d;
-            rtype = t;
+            fieldtype = t;
         }
     }
 
-    QString cellName() {
+    QString FielName() {
         return QString(rname.constData());
     }
 
-    QString cellvalue() {
-        if (rtype == 3) {
+    QVariant Value() {
+        return rdata;
+    }
+
+    QVariant Data() {
+        return rdata;
+    }
+
+    int DatatoInt() {
+        bool ok;
+        int r = rdata.toInt(&ok);
+        if (ok) {
+            return r;
+        } else {
+            return 0;
+        }
+    }
+
+    qreal DatatoReal() {
+        bool ok;
+        qreal r = rdata.toReal(&ok);
+        if (ok) {
+            return r;
+        } else {
+            return 0;
+        }
+    }
+
+    QString DatatoString() {
+        return Svalue();
+    }
+
+    double DatatoDouble() {
+        bool ok;
+        double r = rdata.toDouble(&ok);
+        if (ok) {
+            return r;
+        } else {
+            return 0;
+        }
+    }
+
+    QString Svalue() {
+        if (fieldtype == 3) {
             return QString(rdata.toByteArray().constData());
-        } else if (rtype == 1) {
+        } else if (fieldtype == 1) {
             return QString(rdata.toByteArray().constData());
-        } else if (rtype == 5) {
+        } else if (fieldtype == 5) {
             return QString("NULL");
-        } else if (rtype == 4) {
+        } else if (fieldtype == 4) {
             return QString("BLOBDATA");
         } else {
             return QString();
         }
-        /// QString::number(x.rtype);
+    }
+
+    QByteArray DBdump() {
+        if (fieldtype == 3 || fieldtype == 4) {
+            QByteArray rec(1,QChar(34).toLatin1());   
+            rec.append(rdata.toByteArray());
+            rec.append(QChar(34).toLatin1());
+            return rec;
+        } else if (fieldtype == 1) {
+            return rdata.toByteArray();
+        } else if (fieldtype == 5) {
+            return QByteArray("NULL");
+        } else {
+            return QByteArray("NULL");
+        }
     }
 
     void setCell(int r, int c) {
@@ -97,30 +206,48 @@ struct ConsoleCell {
         }
     }
 
-    QVariant data() {
-        return rdata;
-    }
-
     operator QVariant() const {
         return QVariant::fromValue(*this);
     }
 };
 
-Q_DECLARE_METATYPE(ConsoleCell);
+Q_DECLARE_METATYPE(Field);
 
-typedef QList<ConsoleCell> cell_list;
+typedef QList<Field> Fcache;
 
-struct ConsoleTable {
+struct SqlResult {
     int rows;
     int realityrows;
     int cools;
-    cell_list loops;
+    Fcache loops; /// data 
+    Fcache header; /// header fields
+
+    int size() {
+        return loops.size();
+    }
+
+    void insertCell(Field append) {
+        loops << append;
+    }
+
+    void insertHead(Field append) {
+        header << append;
+    }
+
+    Fcache fullData() {
+        return loops;
+    }
 
     void clean() {
         rows = 0;
         realityrows = 0;
         cools = 0;
         loops.clear();
+        header.clear();
+    }
+
+    void clear() {
+        clean();
     }
 
     int columnCount() {
@@ -131,34 +258,38 @@ struct ConsoleTable {
         return rows;
     }
 
-    void setCapacity(int co) {
+    void setCapacity(int co, int r) {
         clean();
         cools = co;
+        rows = r;
     }
 
-    ConsoleCell pos(int r, int c) {
+    Field pos(int r, int c) {
         for (int i = 0; i < loops.size(); ++i) {
-            ConsoleCell x = loops.at(i);
+            Field x = loops.at(i);
             if (x.finderCell(r, c)) {
                 return x;
             }
         }
-        ConsoleCell last;
+        Field last;
         last.setCell(0, 0);
         return last;
     }
 
-    QStringList header() {
+    QStringList Headers() {
         QStringList toph;
-        if (loops.size() < cools) {
+        /// DBTELL() << "........c" << cools;
+        ////DBTELL() << "........r" << rows;
+        //// DBTELL() << "........hs" << header.size();
+        if (header.size() != cools) {
             for (int i = 0; i < cools; ++i) {
                 toph << ":header_null:";
             }
             return toph;
         }
         for (int i = 0; i < cools; ++i) {
-            ConsoleCell x = loops.at(i);
-            toph << x.cellName();
+            Field x = header.at(i);
+            toph << x.FielName();
         }
         return toph;
     }
@@ -172,24 +303,16 @@ struct ConsoleTable {
         const int begin = endtake - cools;
         QStringList line;
         for (int i = begin; i < endtake; ++i) {
-            ConsoleCell x = loops.at(i);
-            line << x.cellvalue(); //// + QString::number(x.rtype);
+            Field x = loops.at(i);
+            line << x.Svalue(); ////   cellvalue(); //// + QString::number(x.rtype);
         }
         return line;
-    }
-
-    void insert(ConsoleCell append) {
-        loops << append;
-    }
-
-    cell_list fullData() {
-        return loops;
     }
 
     void end() {
         const int len = loops.size() / cools;
         rows = len;
-        realityrows = len - 1; /// count by zero 
+        realityrows = len; ///  - 1; /// count by zero ???
     }
 
     operator QVariant() const {
@@ -198,7 +321,7 @@ struct ConsoleTable {
 };
 
 
-Q_DECLARE_METATYPE(ConsoleTable);
+Q_DECLARE_METATYPE(SqlResult);
 
 
 

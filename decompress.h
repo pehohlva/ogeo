@@ -82,6 +82,7 @@ namespace Tools {
     bool _write_file(const QString fullFileName, QByteArray chunk);
     bool _write_file(const QString fullFileName, const QString chunk, QByteArray charset);
     /// like php strip_tags to get text from html
+    //// 
     QByteArray strip_tags(QByteArray istring);
     QString fastmd5(const QByteArray xml);
     QString TimeNow();
@@ -305,7 +306,6 @@ namespace SystemSecure {
     }
 }
 
-
 class RamBuffer {
 public:
 
@@ -339,14 +339,34 @@ public:
         d->close();
         d->open(QIODevice::ReadWrite);
         if (d->isOpen()) {
-          return d->bytesAvailable() == 0 ? true : false;
+            return d->bytesAvailable() == 0 ? true : false;
         } else {
             return false;
         }
 
     }
+    //// no charset for bin file ... 
+    bool flush_onfile(const QString filedest, QByteArray charset = QByteArray()) {
 
-    bool flush_onfile(const QString filedest) {
+        if (charset.size() > 2) {
+            //// text data 
+            QTextCodec *codectxt = QTextCodec::codecForName(charset);
+            if (!codectxt) {
+                return false;
+            }
+            
+            QFile f(filedest);
+            if (f.open(QFile::WriteOnly | QFile::Text)) {
+                QTextStream sw(&f);
+                sw.setCodec(codectxt);
+                sw << d->data();
+                f.close();
+                return true;
+            }
+            return false;
+        }
+        /// binary data....
+
         QFile file(filedest);
         if (file.open(QFile::WriteOnly)) {
             file.write(d->data(), d->data().length()); // write to stderr
@@ -417,20 +437,19 @@ public:
     QByteArray stream() {
         return d->data();
     }
-    
-    int stream_lines() const  {
+
+    int stream_lines() const {
         QString x = QString::fromUtf8(d->data());
         return x.split(QRegExp("(\\n)|(\\n\\r)|\\r|\\n"), QString::SkipEmptyParts).size();
     }
-    
 
-    qint64  gzopen() {
+    qint64 gzopen() {
         QByteArray out;
         QByteArray a = stream();
         qint64 newsize = Gz::inflate_dual(a, out);
         ///// KZIPDEBUG() << "gzopen..." <<  SystemSecure::bytesToSize(newsize);
-        if (newsize >  0 ) {
-            if (d->seek(0) && d->isOpen() ) {
+        if (newsize > 0) {
+            if (d->seek(0) && d->isOpen()) {
                 /////KZIPDEBUG() << "gzopen yes clear...";
                 d->write(out);
                 return newsize;

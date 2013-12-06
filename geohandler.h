@@ -55,7 +55,7 @@ const int pointo = 76;
               QString("##44##")
 
 #define __DOCVERSION__ \
-              QString("Ve.0.1.5")
+              QString("Ve.0.2.3")
 
 #define __APPNAME__ \
               QString("GeoIp Handler")
@@ -110,7 +110,7 @@ private:
         QStringList fileincomming;
         QDir dir;
         QString ipadress;
-        
+        LongTimer radoswisse;
         bool OnService;
         SqlConsole::SqlMini *miniDB;
 };
