@@ -22,11 +22,19 @@
 #include <ctype.h>
 #include <stdarg.h>
 
+
+#if QT_VERSION < 0x050000
+
+
+
+#else
 Q_DECLARE_OPAQUE_POINTER(sqlite3*)
 Q_DECLARE_METATYPE(sqlite3*)
-
 Q_DECLARE_OPAQUE_POINTER(sqlite3_stmt*)
 Q_DECLARE_METATYPE(sqlite3_stmt*)
+#endif
+
+
 
 #if 0 //// 1 or 0 
 #define DBPR qDebug
